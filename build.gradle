@@ -1,0 +1,111 @@
+plugins {
+    id 'org.springframework.boot' version '4.0.4'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.graalvm.buildtools.native' version '0.11.3'
+    id 'com.google.cloud.tools.jib' version '3.5.1'
+    id 'java'
+}
+
+group = 'top.werls'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+jib{
+    // Google jib plugin for building Docker images
+    from {
+//        image = 'amazoncorretto:21'
+        image = 'gcr.io/distroless/java21-debian12'
+        platforms {
+            platform {
+                architecture = 'amd64'
+                os = 'linux'
+            }
+            platform {
+                architecture = 'arm64'
+                os = 'linux'
+            }
+        }
+    }
+
+    to {
+        // todo change to your docker repository
+        image = "gsdukbh/${project.name.toLowerCase()}"
+        tags = ['latest', version]
+        auth {
+            username = System.getenv('DOCKER_USERNAME') ?: 'gsdukbh'
+            // 从本地文件获取 from file
+            def p = ""
+            try {
+                p = new File('./DOCKER_PASSWORD').text
+            } catch (Exception e) {
+                println "DOCKER_PASSWORD file not found, using environment variable instead."
+            }
+            password = System.getenv('DOCKER_PASSWORD') ?: p
+        }
+    }
+
+    container {
+        creationTime = 'USE_CURRENT_TIMESTAMP'
+        ports = ['8080'] //todo Expose port 8080
+        volumes = ['/app/log','/app/db.sqlite']
+        workingDirectory= '/app'
+        environment = [JAVA_TOOL_OPTIONS: '-XX:+UseContainerSupport -XX:MaxRAMPercentage=80.0']
+    }
+
+}
+
+dependencies {
+
+    def jwtVersion = '0.13.0'
+    def gsonVersion = '2.13.2'
+    def lang3Version = '3.20.0'
+    def springdocVersion = '2.8.14'
+
+    // Caffeine cache https://github.com/ben-manes/caffeine
+    implementation("com.github.ben-manes.caffeine:caffeine:3.2.3")
+    // guava https://github.com/google/guava
+    implementation("com.google.guava:guava:33.5.0-jre")
+
+    implementation "com.google.code.gson:gson:${gsonVersion}"
+    implementation "org.apache.commons:commons-lang3:${lang3Version}"
+
+    // spring doc https://springdoc.org
+    implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
+    // jwt
+    implementation "io.jsonwebtoken:jjwt-api:${jwtVersion}"
+    implementation "io.jsonwebtoken:jjwt-impl:${jwtVersion}"
+    implementation "io.jsonwebtoken:jjwt-gson:${jwtVersion}"
+
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
+    compileOnly 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
